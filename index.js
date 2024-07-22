@@ -52,14 +52,43 @@ const storeZipInMemory = (key, zipContent, timeout) => {
 }
 
 
+const modelcache = {};
+
+// Function to cache data with a timeout
+const cacheData = (key, data, timeout) => {
+    modelcache[key] = { data, timeout: Date.now() + timeout };
+    setTimeout(() => {
+        delete modelcache[key];
+        console.log(`Cache for key ${key} has been invalidated.`);
+    }, timeout);
+};
+
+// Function to get cached data
+const getCachedData = (key) => {
+    const cachedItem = modelcache[key];
+    if (cachedItem && cachedItem.timeout > Date.now()) {
+        return cachedItem.data;
+    }
+    return null;
+};
+
 // Endpoint to scrape models
 router.post('/scrapeModel', async (ctx) => {
     const { id } = ctx.request.body;
+    const cacheKey = `model_${id}`;
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+        ctx.body = cachedData;
+        return;
+    }
+
     try {
         const model = filterModelbyId(id, models);
         if (model) {
             const modelsData = await scrapeAlbumAndFormatData(model);
             ctx.body = modelsData;
+            cacheData(cacheKey, modelsData, 3600000);
         } else {
             ctx.body = { error: "Not found" };
         }
@@ -68,6 +97,7 @@ router.post('/scrapeModel', async (ctx) => {
         ctx.body = { error: error.message };
     }
 });
+
 
 // Endpoint to download model
 router.post('/downloadModel', async (ctx) => {
