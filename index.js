@@ -24,15 +24,33 @@ app.use(koaBody({
 
 // In-memory storage for ZIP files
 const zipStorage = {};
+const zipQueue = []; 
+const MAX_ZIP_FILES = 20;
 
 // Function to store a ZIP file in memory with a timeout
 const storeZipInMemory = (key, zipContent, timeout) => {
+    // If the storage limit is reached, remove the oldest file
+    if (zipQueue.length >= MAX_ZIP_FILES) {
+        const oldestKey = zipQueue.shift();
+        delete zipStorage[oldestKey];
+        console.log(`ZIP file with key ${oldestKey} has been deleted to maintain the limit.`);
+    }
+
     zipStorage[key] = zipContent;
+    zipQueue.push(key);
+
     setTimeout(() => {
         delete zipStorage[key];
         console.log(`ZIP file with key ${key} has been deleted from memory.`);
+        
+        // Remove the key from the queue as well
+        const index = zipQueue.indexOf(key);
+        if (index > -1) {
+            zipQueue.splice(index, 1);
+        }
     }, timeout);
-};
+}
+
 
 // Endpoint to scrape models
 router.post('/scrapeModel', async (ctx) => {
