@@ -1,10 +1,10 @@
-let storedModelData = null; 
+let storedModelData = null;
 document.addEventListener('DOMContentLoaded', function () {
     function debounce(func, wait, immediate) {
         let timeout;
-        return function() {
+        return function () {
             const context = this, args = arguments;
-            const later = function() {
+            const later = function () {
                 timeout = null;
                 if (!immediate) func.apply(context, args);
             };
@@ -14,16 +14,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (callNow) func.apply(context, args);
         };
     }
-    
+
     // Apply debounce to select2 initialization
-    const delayedInit = debounce(function() {
+    const delayedInit = debounce(function () {
         const selectElement = $('#modelSelect');
         selectElement.select2({
             placeholder: 'Select a Model',
             ajax: {
                 url: 'models',
                 dataType: 'json',
-                minimumInputLength: 2, 
+                minimumInputLength: 2,
                 processResults: function (data) {
                     return {
                         results: data.map(function (model) {
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 cache: true
             }
         });
-    }, 300); 
+    }, 300);
     delayedInit();
     $('#getUrlButton').on('click', async function () {
         const selectedModel = $('#modelSelect').select2('data')[0];
@@ -69,28 +69,99 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('No model selected.');
         }
     });
-    
+
     $('#getSourceButton').on('click', async function () {
         $('#models').removeClass('hidden');
     });
+    const timePeriodSelect = document.getElementById('time-period');
+    const fetchModels = async (timePeriod) => {
+        try {
+            const response = await fetch(`/most-downloaded?time_period=${timePeriod}`);
+            const models = await response.json();
+    
+            // Clear existing grid items
+            modelGrid.innerHTML = '';
+    
+            // Populate grid with model images
+            models.forEach(model => {
+                const gridItem = document.createElement('div');
+                gridItem.classList.add('w-full', 'sm:w-1/2', 'md:w-1/3', 'lg:w-1/4', 'p-2', 'flex', 'justify-center');
+    
+                gridItem.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden text-center">
+                        <img src="${model.image}" alt="${model.name}" class="model-image w-full h-48 object-cover cursor-pointer" data-albums='${JSON.stringify(model.albums)}'>
+                        <div class="p-4">
+                            <h2 class="text-gray-800 text-lg font-semibold">${model.name}</h2>
+                        </div>
+                    </div>
+                `;
+                modelGrid.appendChild(gridItem);
+            });
+    
+            // Add event listeners for model images
+            document.querySelectorAll('.model-image').forEach(image => {
+                image.addEventListener('click', (event) => {
+                    const albums = JSON.parse(event.currentTarget.getAttribute('data-albums'));
+                    showAlbumPopup(albums);
+                });
+            });
+        } catch (error) {
+            console.error('Error fetching models:', error);
+        }
+    };
+    
+    // Function to show album popup
+    const showAlbumPopup = (albums) => {
+        const popup = document.createElement('div');
+        popup.classList.add('fixed', 'inset-0', 'bg-black', 'bg-opacity-75', 'flex', 'flex-wrap', 'justify-center', 'items-center', 'p-5', 'overflow-y-auto', 'z-50');
+    
+        albums.forEach(album => {
+            const albumDiv = document.createElement('div');
+            albumDiv.classList.add('bg-white', 'm-2', 'p-4', 'rounded-md', 'shadow-lg', 'text-center');
+    
+            albumDiv.innerHTML = `
+                <img src="${album.img}" alt="${album.title}" class="w-full h-auto mb-2 rounded-md">
+                <a href="${album.url}" target="_blank" class="block mb-2 text-blue-500 hover:underline">${album.title}</a>
+                <p class="text-gray-700">Image Count: ${album.count}</p>
+            `;
+            popup.appendChild(albumDiv);
+        });
+    
+        document.body.appendChild(popup);
+    
+        // Close popup when clicking outside of it
+        popup.addEventListener('click', (event) => {
+            if (event.target === popup) {
+                document.body.removeChild(popup);
+            }
+        });
+    };    
+
+    // Initial fetch
+    fetchModels(timePeriodSelect.value);
+
+    // Fetch models when time period changes
+    timePeriodSelect.addEventListener('change', () => {
+        fetchModels(timePeriodSelect.value);
+    });
 });
-async function downloadModel(){
+async function downloadModel() {
     let albumData = [];
-    $('#result > div > div.grid.grid-cols-1.sm\\:grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-4.gap-6 > div> div > label > input').each(function() {
+    $('#result > div > div.grid.grid-cols-1.sm\\:grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-4.gap-6 > div> div > label > input').each(function () {
         const parentDiv = $(this).closest('.p-4');
         const imgTag = parentDiv.parent().find('img');
         const titleTag = parentDiv.find('h4');
-        
+
         if (imgTag.length > 0 && this.checked) {
-            albumData.push({title:titleTag.text(),url:imgTag.attr('url'),count:parentDiv.find('input[type=number]').val()});
+            albumData.push({ title: titleTag.text(), url: imgTag.attr('url'), count: parentDiv.find('input[type=number]').val() });
         }
     });
     const id = storedModelData.id;
-    const params = {id,albumData}
+    const params = { id, albumData }
     downloadFile(params)
 }
 async function downloadFile(parameters) {
-    const fileName = storedModelData.name+'.zip';
+    const fileName = storedModelData.name + '.zip';
     try {
         showLoading();
 
@@ -240,3 +311,28 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
 });
 
+document.getElementById('time-period').addEventListener('change', (event) => {
+    const selectedPeriod = event.target.value;
+    fetchData(selectedPeriod);
+});
+
+async function fetchData(timePeriod) {
+    try {
+        const response = await fetch(`/modelstats?timePeriod=${timePeriod}`);
+        const data = await response.json();
+
+        const tableBody = document.getElementById('model-table-body');
+        tableBody.innerHTML = '';
+
+        data.forEach(model => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">${model.model_id}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${model.download_count}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    }
+}
