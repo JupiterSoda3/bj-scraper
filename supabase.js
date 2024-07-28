@@ -46,7 +46,6 @@ const getMostDownloadedModels = async (limit = 10, timePeriod) => {
             .from('model_data')
             .select('*')
             .gte('created_at', sinceDate.toISOString())
-            .order('download_count', { ascending: false })
             .limit(limit);
 
         if (error) {
