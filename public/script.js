@@ -44,27 +44,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectedModel = $('#modelSelect').select2('data')[0];
         if (selectedModel) {
             const id = selectedModel.id;
-            showLoading();
-            try {
-                const response = await fetch('/scrapeModel', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ id })
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to fetch data');
-                }
-                const data = await response.json();
-                storedModelData = data;
-                storedModelData.id = id;
-                loadModelData(data);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            } finally {
-                hideLoading();
-            }
+            loadModelbyId(id);
         } else {
             console.error('No model selected.');
         }
@@ -90,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 gridItem.innerHTML = `
                     <div class="bg-white rounded-lg shadow-lg overflow-hidden text-center">
                         <img src="${model.image}" alt="${model.name}" class="model-image w-full h-48 object-cover cursor-pointer" data-albums='${JSON.stringify(model.albums)}'>
-                        <div class="p-4">
+                        <div class="model-btn p-4 cursor-pointer" model-id="${model.model_id}">
                             <h2 class="text-gray-800 text-lg font-semibold">${model.name}</h2>
                         </div>
                     </div>
@@ -105,25 +85,62 @@ document.addEventListener('DOMContentLoaded', function () {
                     showAlbumPopup(albums);
                 });
             });
+            // Add event listeners for model images
+            document.querySelectorAll('.model-btn').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    const id = event.currentTarget.getAttribute('model-id');
+                    loadModelbyId(id);
+                });
+            });
         } catch (error) {
             console.error('Error fetching models:', error);
         }
     };
     
-    // Function to show album popup
     const showAlbumPopup = (albums) => {
         const popup = document.createElement('div');
         popup.classList.add('fixed', 'inset-0', 'bg-black', 'bg-opacity-75', 'flex', 'flex-wrap', 'justify-center', 'items-center', 'p-5', 'overflow-y-auto', 'z-50');
     
         albums.forEach(album => {
             const albumDiv = document.createElement('div');
-            albumDiv.classList.add('bg-white', 'm-2', 'p-4', 'rounded-md', 'shadow-lg', 'text-center');
+            albumDiv.classList.add('bg-white', 'm-2', 'p-4', 'rounded-md', 'shadow-lg', 'text-center', 'relative', 'w-full', 'max-w-sm');
+    
+            const slideshowContainer = document.createElement('div');
+            slideshowContainer.classList.add('relative', 'w-full', 'h-64', 'mb-4');
+    
+            album.img_list.forEach((img, index) => {
+                const slide = document.createElement('div');
+                slide.classList.add('absolute', 'w-full', 'h-full', 'transition-opacity', 'duration-700', index === 0 ? 'opacity-100' : 'opacity-0');
+                slide.setAttribute('type',"slide");
+                slide.innerHTML = `<img src="${img.url}" alt="${album.title} ${index + 1}" class="w-full h-full object-cover rounded-md">`;
+                slideshowContainer.appendChild(slide);
+            });
+    
+            const prevButton = document.createElement('button');
+            prevButton.innerHTML = '&laquo;';
+            prevButton.classList.add('absolute', 'left-0', 'top-1/2', 'transform', '-translate-y-1/2', 'bg-black', 'bg-opacity-50', 'text-white', 'p-2', 'rounded-full', 'hover:bg-opacity-75', 'focus:outline-none');
+            
+            prevButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                showSlide(albumDiv, -1);
+            });
+    
+            const nextButton = document.createElement('button');
+            nextButton.innerHTML = '&raquo;';
+            nextButton.classList.add('absolute', 'right-0', 'top-1/2', 'transform', '-translate-y-1/2', 'bg-black', 'bg-opacity-50', 'text-white', 'p-2', 'rounded-full', 'hover:bg-opacity-75', 'focus:outline-none');
+            nextButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                showSlide(albumDiv, 1);
+            });
+    
+            slideshowContainer.appendChild(prevButton);
+            slideshowContainer.appendChild(nextButton);
     
             albumDiv.innerHTML = `
-                <img src="${album.img}" alt="${album.title}" class="w-full h-auto mb-2 rounded-md">
                 <a href="${album.url}" target="_blank" class="block mb-2 text-blue-500 hover:underline">${album.title}</a>
-                <p class="text-gray-700">Image Count: ${album.count}</p>
+                <p class="text-gray-700 mb-2">Image Count: ${album.count}</p>
             `;
+            albumDiv.insertBefore(slideshowContainer, albumDiv.firstChild);
             popup.appendChild(albumDiv);
         });
     
@@ -135,7 +152,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.body.removeChild(popup);
             }
         });
-    };    
+    
+        // Function to show the slide
+        function showSlide(albumDiv, n) {
+            const slides = albumDiv.querySelectorAll(`[type="slide"]`);
+            let currentIndex = Array.from(slides).findIndex(slide => slide.classList.contains('opacity-100'));
+            slides[currentIndex].classList.remove('opacity-100');
+            slides[currentIndex].classList.add('opacity-0');
+            currentIndex = (currentIndex + n + slides.length) % slides.length;
+            slides[currentIndex].classList.remove('opacity-0');
+            slides[currentIndex].classList.add('opacity-100');
+        }
+    };  
 
     // Initial fetch
     fetchModels(timePeriodSelect.value);
@@ -145,6 +173,31 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchModels(timePeriodSelect.value);
     });
 });
+
+async function loadModelbyId(id){
+    showLoading();
+            try {
+                const response = await fetch('/scrapeModel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id })
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                const data = await response.json();
+                storedModelData = data;
+                storedModelData.id = id;
+                loadModelData(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            } finally {
+                hideLoading();
+            }
+}
+
 async function downloadModel() {
     let albumData = [];
     $('#result > div > div.grid.grid-cols-1.sm\\:grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-4.gap-6 > div> div > label > input').each(function () {

@@ -296,6 +296,7 @@ const transformDataAndDownload = async (model, albumData, onProgress) => {
             maxcount: maxCount
         };
         album.img = images[0].url;
+        album.img_list = orderedImages;
         transformedData[cleanString(name)].blackjackeventkeys.push(albumKey);
         downloadedAlbums.push(album);
     }

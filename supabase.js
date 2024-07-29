@@ -58,6 +58,7 @@ const getMostDownloadedModels = async (limit = 10, timePeriod) => {
                 acc[model.name] = {
                     name: model.name,
                     image: model.image,
+                    model_id: model.model_id,
                     albums: []
                 };
             }
