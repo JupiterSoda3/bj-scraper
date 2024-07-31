@@ -4,6 +4,7 @@ const { cacheData, getCachedData } = require('./cache');
 const { storeZipInMemory, zipStorage } = require('./zipHandler');
 const { storeModelDataInSupabase, getMostDownloadedModels } = require('./supabase');
 const JSZip = require('jszip');
+const fs = require('fs');
 
 
 const scrapeModel = async (ctx) => {
